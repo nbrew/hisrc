@@ -11,8 +11,13 @@
 		els: $(),
 		init: false
 	};
+	$.breakpoint.defaults = {
+		breakpoints: []
+	};
 
-	$.fn.breakpoint = function() {
+	$.fn.breakpoint = function(options) {
+		var settings = $.extend({}, $.breakpoint.defaults, options);
+
 		$.breakpoint.els = $.breakpoint.els.add(this);
 
 		if (!$.breakpoint.init) {
@@ -24,12 +29,29 @@
 		return this.each(function(){
 			var $el = $(this),
 				maxWidths = [],
-				minWidths = [];
+				minWidths = [],
+				breakpoint_images = [];
 
 			$el.data('m1src', $el.attr('src'));
 
-			// parse breakpoints.
-			$.each( $el.data(), function(key, value) {
+			var deepsearch = function(blob, hunt) {
+				var results = [],
+						tmp = null;
+				$.each( blob, function(i, item) {
+					if (item instanceof Array) {
+						if ((tmp = $.inArray(hunt, item)) >= 0) {
+							results.push(i);
+						}
+					} else {
+						if (hunt == item) {
+							results.push(i);
+						}
+					}
+				});
+				return results;
+			};
+
+			parse_data_breakpoint = function(key, value) {
 				if (key && (key.toLowerCase().indexOf('maxwidth') === 0 || key.toLowerCase().indexOf('minwidth') === 0)) {
 					var width = key.substring(3).match( /\d+/g );
 					if (width.length === 1) {
@@ -47,7 +69,32 @@
 						}
 					}
 				}
+			};
+
+			parse_breakpoints_option = function() {
+				// get bp-widthn options
+				$.each( $el.data(), function(key, value) {
+					if (key && (key.toLowerCase().indexOf('bpwidth') === 0)) {
+						breakpoint_images[key.toString().match( /\d+/g )] = value;
+					}
+				});
+				$.each( settings.breakpoints, function(index, value) {
+					if (value instanceof Array) {
+						$.each(value, function(k, width_bp){
+							parse_data_breakpoint(width_bp, breakpoint_images[index]);
+						});
+					} else {
+						parse_data_breakpoint(value, breakpoint_images[index]);
+					}
+				});
+			};
+
+			// parse breakpoints.
+			$.each( $el.data(), function(key, value) {
+				parse_data_breakpoint(key, value);
 			});
+			parse_breakpoints_option();
+
 			console.log(minWidths);
 			// sort low to high.
 			minWidths.sort(function( a, b ) {
@@ -87,8 +134,21 @@
 						// fallback to mobile first if no matches.
 						if ( activeBreakpoint != null ) {
 							console.log('using breakpoint: ' + activeBreakpoint.key);
-							$el.attr( 'src', $el.data( activeBreakpoint.key ) );
-
+							console.log(settings.breakpoints)
+							console.log('breakpoint index: ' +
+													deepsearch(
+														settings.breakpoints,
+														activeBreakpoint.key
+													)
+												);
+							$el.attr( 'src',
+												$el.data( activeBreakpoint.key ) ||
+													breakpoint_images[
+														deepsearch(
+															settings.breakpoints,
+															activeBreakpoint.key
+														)]
+								);
 						} else {
 							console.log('using mobile1st');
 							$el.attr( 'src', $el.data('m1src') );
